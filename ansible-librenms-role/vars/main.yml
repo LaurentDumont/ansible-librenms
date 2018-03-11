@@ -1,0 +1,10 @@
+MYSQL_PASSWORD: areallylongpassword
+LIBRENMS_DB_PASSWORD: areallylongpassword
+LIBRENMS_ADMIN_USER_PASSWORD: areallylongpassword
+LIBRENMS_USER_EMAIL: sysadmin@northernsysadmin.com
+
+#INFLUXDB
+influxdb_enabled: false
+
+#OXIDIZED
+oxidized_enabled: false

@@ -1,0 +1,12 @@
+---
+
+- name: Initialize the LibreNMS Database Schema
+  command: chdir=/opt/librenms/ php ./build-base.php
+
+- name: Create the admin user
+  command: chdir=/opt/librenms/ php ./adduser.php admin {{ LIBRENMS_ADMIN_USER_PASSWORD }} 10 sysadmin@dhmtl.ca
+
+- name: Add all the devices in inventory
+  command: chdir=/opt/librenms/ php ./addhost.php -f {{ item }} givemeallyourdata v2c udp
+  with_inventory_hostnames: all
+  ignore_errors: true

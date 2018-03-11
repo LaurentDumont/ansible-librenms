@@ -1,0 +1,23 @@
+---
+
+- name: Get the Weathermap plugin.
+  git:
+    repo: https://github.com/librenms-plugins/Weathermap
+    dest: /opt/librenms/html/plugins/Weathermap
+    depth: 1
+
+- name: Correct folder permission for the Weathermap plugin folder.
+  file:
+    state: directory
+    owner: librenms
+    group: librenms
+    path: /opt/librenms/html/plugins/Weathermap
+    recurse: yes
+
+- name: Correct folder permission for the Weathermap plugin folder.
+  file:
+    state: directory
+    owner: www-data
+    group: www-data
+    path: /opt/librenms/html/plugins/Weathermap/configs
+    recurse: yes

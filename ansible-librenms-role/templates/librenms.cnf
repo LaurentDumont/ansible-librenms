@@ -1,0 +1,4 @@
+# {{ ansible_managed }}
+[mysqld]
+innodb_file_per_table=1
+sql-mode=""

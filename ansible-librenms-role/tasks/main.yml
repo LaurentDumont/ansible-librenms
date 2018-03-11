@@ -1,0 +1,193 @@
+---
+
+- name: Add GPG key for dotdb repo.
+  apt_key:
+    url: https://www.dotdeb.org/dotdeb.gpg
+    state: present
+
+- name: Set options for MariaDB root password.
+  debconf:
+    name: 'mariadb-server'
+    question: 'mysql-server/root_password'
+    value: '{{ MYSQL_PASSWORD | quote }}'
+    vtype: 'password'
+
+- name: Set options for MariaDB root password.
+  debconf:
+    name: 'mariadb-server'
+    question: 'mysql-server/root_password_again'
+    value: "{{ MYSQL_PASSWORD }}"
+    vtype: 'password'
+
+- name: Install the prerequisites.
+  package:
+    name: "{{ item }}"
+  with_items:
+    - mariadb-server
+    - mariadb-client
+    - composer
+    - php7.0
+    - php7.0-cli
+    - php7.0-mysql
+    - php7.0-gd
+    - php7.0-zip
+    - php7.0-xml
+    - php7.0-snmp
+    - php-pear
+    - php7.0-curl
+    - graphviz
+    - php7.0-mcrypt
+    - php7.0-json
+    - apache2
+    - fping
+    - imagemagick
+    - whois
+    - mtr-tiny
+    - snmp
+    - snmpd
+    - nmap
+    - python-mysqldb
+    - php-net-ipv6
+    - rrdtool
+    - git
+    - rrdcached
+
+
+
+- name: Install php-net-ipv4
+  apt:
+    deb: "http://http.us.debian.org/debian/pool/main/p/php-net-ipv4/php-net-ipv4_1.3.4-2_all.deb"
+
+- name: MariaDB specific configuration.
+  template:
+    src:  librenms.cnf
+    dest: /etc/mysql/conf.d/
+  notify: restart mariadb
+
+- name: Create LibreNMS Database.
+  mysql_db:
+    name: librenms
+    state: present
+    login_user: root
+    login_password: "{{ MYSQL_PASSWORD }}"
+
+- name: Create Mysql LibreNMS user.
+  mysql_user:
+    name: librenms
+    password: "{{ LIBRENMS_DB_PASSWORD }}"
+    host: localhost
+    priv: 'librenms.*:ALL'
+    state: present
+    login_user: root
+    login_password: "{{ MYSQL_PASSWORD }}"
+
+- name: Create LibreNMS linux user.
+  user:
+    name: librenms
+    comment: "LibrenMS user for monitoring"
+    groups: www-data
+    state: present
+    system: yes
+
+- name: Create the LibreNMS project folder with Composer.
+  command: composer create-project --no-dev --keep-vcs librenms/librenms librenms dev-master
+  args:
+    chdir: /opt
+
+- name: Create RRD and Log folders for LibreNMS.
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: 0775
+  with_items:
+    - /opt/librenms/logs
+    - /opt/librenms/rrd
+
+#- name: Add variables from influxdb
+#  include_vars: roles/influxdb/vars/main.yml
+
+- name: Add config.php for LibreNMS.
+  template:
+    src: config.php
+    dest: /opt/librenms
+
+- name: Add the rrdcached config.
+  template:
+    src: rrdcached
+    dest: /etc/default/
+
+- name: Restart rrdcached
+  service:
+    name: rrdcached
+    state: restarted
+    enabled: yes
+
+- name: Correct ownership  for rrdcached Unix socket.
+  command: chown www-data:www-data /var/run/rrdcached.sock
+
+- name: Correct permission for rrdcached Unix socket.
+  command: chmod 777 /var/run/rrdcached.sock
+
+- name: Allow LibreNMS user on LibreNMS folder.
+  file:
+    path: /opt/librenms
+    state: directory
+    recurse: yes
+    owner: librenms
+    group: librenms
+
+- name: Apache2 template for LibreNMS.
+  template:
+    src: site-librenms.conf
+    dest: /etc/apache2/sites-available
+  notify: restart apache2
+
+- name: Enable the mod rewrite module for apache2.
+  apache2_module:
+    name: rewrite
+    state: present
+  notify: restart apache2
+
+- name: Check the status of the Apache2 LibreNMS config.
+  stat:
+    path: /etc/apache2/sites-enabled/site-librenms.conf
+  register: librenms_apache2_status
+
+- name: Check the status of the Apache2 default config.
+  stat:
+    path: /etc/apache2/sites-enabled/000-default.conf
+  register: default_apache2_status
+
+- name: Disable Apache2 mpm_event
+  command: a2dismod mpm_event
+
+- name: Enable mpm_prefork
+  command: a2enmod mpm_prefork
+
+- name: Enable php mcrypt
+  command: phpenmod mcrypt
+
+- name: Disable the default Apache2 config.
+  command: a2dissite 000-default.conf
+  when: default_apache2_status
+  notify: restart apache2
+
+- name: Enable the LibreNMS Apache2 config.
+  command: a2ensite site-librenms.conf
+  when: librenms_apache2_status.stat.exists == False
+  notify: restart apache2
+
+- name: Set PHP options for Zabbix.
+  template:
+    src: 20-librenms.ini
+    dest: /etc/php/7.0/apache2/conf.d/
+  notify: restart apache2
+
+- name: Add the LibreNMS cron job file.
+  template:
+    src: librenms-cron
+    dest: /etc/cron.d/
+
+- include_tasks: setup-librenms.yml
+- include_tasks: weathermap-php.yml
+- include_tasks: vlan-search.yml

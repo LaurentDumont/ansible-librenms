@@ -1,0 +1,15 @@
+---
+
+- name: Install the Plugin files for Vlan-Search
+  git:
+    repo: https://github.com/librenms-plugins/Vlan_Search.git
+    dest: /opt/librenms/html/plugins/Vlan_Search
+    depth: 1
+
+- name: Correct folder permission for the Weathermap plugin folder.
+  file:
+    state: directory
+    owner: librenms
+    group: librenms
+    path: /opt/librenms/html/plugins/Vlan_Search
+    recurse: yes
